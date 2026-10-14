@@ -1,0 +1,34 @@
+PENGUJIAN OPERASI GET (AWAL)
+Mendapatkan response 200 dengan content-length 160 B (single record) / 328 B (3 records) / 406 B (4 records).
+
+BAGIAN A: TABEL HASIL PENGUJIAN BENCHMARK
+=================================================================
+Data Count   | XML (Bytes)  | JSON (Bytes) | Reduksi Efisiensi (%)
+=================================================================
+10           | 1438         | 1166         | 18.92%
+50           | 7058         | 5826         | 17.46%
+100          | 14084        | 11652        | 17.27%
+500          | 70684        | 58652        | 17.02%
+=================================================================
+
+BAGIAN B: ANALISIS PERTANYAAN KRITIS
+
+1. Analisis Struktur Payload:
+Faktor sintaksis yang membuat XML menghasilkan ukuran data (bytes) jauh lebih besar dibandingkan JSON untuk data yang identik:
+- Redundansi Tag Penutup (Closing Tags): XML mewajibkan setiap elemen memiliki tag pembuka dan tag penutup lengkap yang menduplikasi nama elemen (misal: <jurusan>...</jurusan>, <student>...</student>). JSON hanya menuliskan nama key satu kali ("jurusan": "...") tanpa penutup berulang.
+- Ketiadaan Tipe Data Array Native pada XML: Untuk kumpulan data, XML membungkus tiap record dalam tag <student>...</student> dan tag induk <students>...</students>. JSON cukup menggunakan kurung siku [...] dan kurung kurawal {...} dengan pemisah koma.
+- Karakter Pembatas Sintaksis: Setiap tag penutup XML memerlukan 3 karakter (<, /, >). Pada 500 rekaman data, tag XML menyumbang overhead hingga 12.032 bytes lebih besar daripada representasi JSON.
+
+2. Analisis Deserialisasi / Parsing di Sisi Klien:
+Perbedaan teknis pemrosesan di browser (front-end):
+- Pada XML: Browser harus menginisialisasi DOMParser, membangun struktur pohon dokumen XML DOM penuh di heap memori, lalu melakukan traversal manual menggunakan getElementsByTagName atau XPath, serta mengonversi tipe data string ke numerik/boolean secara manual.
+- Pada JSON: Browser menggunakan parser native C++ bawaan engine JavaScript (JSON.parse() atau response.json()) yang langsung memetakan payload teks ke objek/array native JavaScript dalam satu fase memori, tanpa overhead pembuatan struktur DOM tree. Data langsung dapat diakses dengan dot notation (obj.data[0].nama) dan tipe data primitif tetap terjaga.
+- Ekosistem web beralih ke JSON karena: keselarasan alami dengan JavaScript (zero-impedance mismatch), performa eksekusi parsing yang jauh lebih cepat, ergonomi kode yang jauh lebih ringkas, dan efisiensi konsumsi bandwidth jaringan seluler.
+
+3. Bottleneck Arsitektur RESTful Synchronous:
+Skenario sistem legacy C membutuhkan 1.5 detik file locking saat menulis ke data.txt dengan 100 klien POST bersamaan:
+- Antrean HTTP: Operasi write terkunci (file lock) sehingga 100 request dipaksa dieksekusi secara sekuensial. Klien ke-1 selesai dalam 1.5 detik, klien ke-50 menunggu 75 detik, dan klien ke-100 menunggu 150 detik (2.5 menit).
+- Akibatnya: Mayoritas klien (>70%) akan mengalami HTTP 504 Gateway Timeout atau pemutusan koneksi TCP karena melebihi batas default timeout (30-60 detik). Server juga akan mengalami thread pool exhaustion di mana worker thread habis terisi request yang blocked, menolak request baru yang masuk (HTTP 503 / connection refused).
+- Mengapa Synchronous Blocking pada HTTP/1.1 menjadi Bottleneck: Karena tight coupling antara siklus hidup klien dan server, serta ketiadaan transport multiplexing pada HTTP/1.1 (Head-of-Line Blocking).
+- Solusi Message Broker (Minggu 6): Menggunakan pola asynchronous producer-consumer (RabbitMQ/Kafka). API Gateway memvalidasi input lalu memasukkan request ke memory queue broker dalam 1-2 ms, kemudian langsung membalas HTTP 202 Accepted ke klien. Background worker memproses antrean satu per satu ke file legacy tanpa memblokir web server.
+- Solusi gRPC (Minggu 5): Berjalan di atas HTTP/2 yang mendukung binary framing dan multiplexing banyak stream RPC dalam satu koneksi TCP fisik tunggal, menghilangkan HoL blocking, serta mendukung client streaming untuk pengiriman data batch secara kontinu dan efisien.
