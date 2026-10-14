@@ -6,6 +6,11 @@ Repositori laboratorium Protocol Buffers (`protobuf`) dan `gRPC` untuk transmisi
 ```text
 protobuf-lab/
 ├── docker-compose.yml
+├── README.md
+├── images/
+│   ├── image1.png
+│   ├── image2.png
+│   └── image3.png
 ├── protos/
 │   └── exchange.proto
 ├── server-a-sender/
@@ -60,3 +65,16 @@ docker run --rm --name receiver-container --network integration-net -p 50051:500
 docker run --rm -it --name sender-container --network integration-net image-server-a
 ```
 Masukkan NIM dan Nama Mahasiswa pada konsol Terminal 2, lalu amati ukuran payload dan waktu transmisi real-time pada Terminal 1.
+
+---
+
+## 📸 Dokumentasi Hasil Pengujian
+
+### 1. Inisialisasi Node Penerima (Server B)
+![Inisialisasi Server B](images/image1.png)
+
+### 2. Antarmuka Aliran Data Pengirim (Server A)
+![Eksekusi Server A](images/image2.png)
+
+### 3. Transaksi Protobuf Masuk Secara Real-Time (Server B)
+![Log Transaksi Server B](images/image3.png)
