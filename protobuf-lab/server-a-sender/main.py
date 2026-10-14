@@ -1,11 +1,13 @@
+import os
 import time
 import grpc
 import exchange_pb2
 import exchange_pb2_grpc
 
 def run():
-    # Menargetkan Server B menggunakan nama alias kontainer jaringan Docker
-    channel = grpc.insecure_channel('receiver-container:50051')
+    # Menargetkan Server B menggunakan nama alias kontainer jaringan Docker (atau localhost jika via env)
+    receiver_host = os.getenv('RECEIVER_HOST', 'receiver-container')
+    channel = grpc.insecure_channel(f'{receiver_host}:50051')
     stub = exchange_pb2_grpc.ExchangeServiceStub(channel)
 
     print("=== SERVER A: ANTARMUKA ALIRAN DATA PROTOC ===")
